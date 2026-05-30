@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>校园二手交易平台 - 共享版</title>
+  <style>
+    :root {
+      --primary: #4a90d9;
+      --primary-hover: #357abd;
+      --success: #52c41a;
+      --warning: #faad14;
+      --danger: #ff4d4f;
+      --text: #333;
+      --text-secondary: #666;
+      --text-light: #999;
+      --border: #e8e8e8;
+      --bg: #f5f5f5;
+      --white: #ffffff;
+      --shadow: 0 2px 8px rgba(0,0,0,0.1);
+      --radius: 8px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: var(--bg); color: var(--text); }
+    .container { max-width: 1000px; margin: 0 auto; padding: 0 15px; }
+    
+    .header {
+      background: var(--white);
+      box-shadow: var(--shadow);
+      padding: 15px 0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo { font-size: 20px; font-weight: bold; color: var(--primary); cursor: pointer; }
+    .nav button {
+      margin-left: 8px;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      background: none;
+      cursor: pointer;
+    }
+    .nav button:hover { color: var(--primary); }
+
+    .search {
+      background: white;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .search-box {
+      display: flex;
+      gap: 10px;
+    }
+    .search-input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .category {
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+
+    .goods-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 15px;
+      padding: 20px 0;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+    }
+    .card-img {
+      height: 140px;
+      background: #eee;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+    }
+    .card-body { padding: 12px; }
+    .card-title { font-weight: bold; margin-bottom: 5px; }
+    .card-price { color: red; font-size: 16px; font-weight: bold; margin: 5px 0; }
+    .card-user { color: #666; font-size: 12px; }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .btn {
+      padding: 10px 16px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .btn:hover { background: #357abd; }
+    .btn-danger { background: var(--danger); }
+
+    form {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 500px;
+      margin: 20px auto;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+    .modal.show { display: flex; }
+    .modal-content {
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 400px;
+    }
+
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 6px;
+      z-index: 9999;
+      display: none;
+    }
+    .toast.show { display: block; }
+  </style>
+</head>
+
+<body>
+
+<!-- 云端数据库 -->
+<script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
+<script>
+AV.init({
+  appId: "YOUR_APP_ID",
+  appKey: "YOUR_APP_KEY",
+  serverURL: "https://your-server-url.leancloud.cn"
+});
+</script>
+
+<!-- 头部导航 -->
+<div class="header">
+  <div class="container header-content">
+    <div class="logo" onclick="go('home')">校园二手交易平台</div>
+    <div class="nav" id="nav"></div>
+  </div>
+</div>
+
+<!-- 首页 -->
+<div class="page active" id="home">
+  <div class="search">
+    <div class="container search-box">
+      <input class="search-input" id="keyword" placeholder="搜索商品" oninput="loadGoods()">
+      <select class="category" id="cate" onchange="loadGoods()">
+        <option value="">全部</option>
+        <option>手机数码</option>
+        <option>图书教材</option>
+        <option>生活用品</option>
+        <option>交通工具</option>
+        <option>运动器材</option>
+      </select>
+    </div>
+  </div>
+  <div class="container">
+    <div class="goods-list" id="list"></div>
+  </div>
+</div>
+
+<!-- 发布页面 -->
+<div class="page" id="publish">
+  <div class="container">
+    <form onsubmit="publish(event)">
+      <h3>发布商品</h3>
+      <input placeholder="标题" id="title" required>
+      <textarea placeholder="描述" id="desc"></textarea>
+      <input placeholder="价格" id="price" required>
+      <select id="category">
+        <option>手机数码</option>
+        <option>图书教材</option>
+        <option>生活用品</option>
+        <option>交通工具</option>
+        <option>运动器材</option>
+      </select>
+      <button class="btn" type="submit">发布</button>
+    </form>
+  </div>
+</div>
+
+<!-- 详情页 -->
+<div class="page" id="detail">
+  <div class="container" style="padding:20px;background:white;border-radius:8px;margin-top:20px;">
+    <h2 id="d-title"></h2>
+    <p style="color:red;font-size:20px;margin:10px 0;" id="d-price"></p>
+    <p id="d-desc"></p>
+    <p>分类：<span id="d-cate"></span></p>
+    <p>卖家：<span id="d-user"></span></p>
+    <button class="btn" onclick="go('home')">返回</button>
+  </div>
+</div>
+
+<!-- 登录弹窗 -->
+<div class="modal" id="loginModal">
+  <div class="modal-content">
+    <h3>登录</h3>
+    <input id="loginUser" placeholder="用户名">
+    <input type="password" id="loginPwd" placeholder="密码">
+    <button class="btn" onclick="login()">登录</button>
+    <button style="background:none;border:none;margin-top:10px;cursor:pointer" onclick="showReg()">去注册</button>
+  </div>
+</div>
+
+<!-- 注册弹窗 -->
+<div class="modal" id="regModal">
+  <div class="modal-content">
+    <h3>注册</h3>
+    <input id="regUser" placeholder="用户名">
+    <input type="password" id="regPwd" placeholder="密码">
+    <button class="btn" onclick="reg()">注册</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let user = null;
+
+function showToast(msg){
+  let t = document.getElementById("toast");
+  t.innerText = msg;
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2000);
+}
+
+function go(page){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.getElementById(page).classList.add("active");
+  if(page==="home") loadGoods();
+}
+
+async function loadUser(){
+  let u = localStorage.getItem("user");
+  if(u) {
+    user = JSON.parse(u);
+    document.getElementById("nav").innerHTML = `
+      <button onclick="go('publish')">发布</button>
+      <button onclick="logout()">退出</button>
+    `;
+  }else{
+    document.getElementById("nav").innerHTML = `<button onclick="document.getElementById('loginModal').classList.add('show')">登录</button>`;
+  }
+}
+
+function logout(){
+  user = null;
+  localStorage.removeItem("user");
+  loadUser();
+  go("home");
+  showToast("已退出");
+}
+
+async function login(){
+  let username = document.getElementById("loginUser").value;
+  let pwd = document.getElementById("loginPwd").value;
+  if(!username||!pwd) return showToast("请输入账号密码");
+  
+  try{
+    const query = new AV.Query("User");
+    query.equalTo("username", username);
+    query.equalTo("pwd", pwd);
+    let u = await query.first();
+    if(!u) return showToast("账号或密码错误");
+    
+    user = {id:u.id, username:u.get("username")};
+    localStorage.setItem("user", JSON.stringify(user));
+    document.getElementById("loginModal").classList.remove("show");
+    loadUser();
+    showToast("登录成功");
+  }catch(e){ showToast("登录失败"); }
+}
+
+async function reg(){
+  let username = document.getElementById("regUser").value;
+  let pwd = document.getElementById("regPwd").value;
+  if(!username||!pwd) return showToast("请输入");
+  
+  try{
+    const User = AV.Object.extend("User");
+    const u = new User();
+    u.set("username", username);
+    u.set("pwd", pwd);
+    await u.save();
+    showToast("注册成功，请登录");
+    document.getElementById("regModal").classList.remove("show");
+    document.getElementById("loginModal").classList.add("show");
+  }catch(e){ showToast("用户名已存在"); }
+}
+
+function showReg(){
+  document.getElementById("loginModal").classList.remove("show");
+  document.getElementById("regModal").classList.add("show");
+}
+
+async function loadGoods(){
+  let list = document.getElementById("list");
+  list.innerHTML = "加载中...";
+  let kw = document.getElementById("keyword").value;
+  let cate = document.getElementById("cate").value;
+  
+  try{
+    let query = new AV.Query("Good");
+    if(kw) query.contains("title", kw);
+    if(cate) query.equalTo("category", cate);
+    query.descending("createdAt");
+    let res = await query.find();
+    
+    if(res.length===0) { list.innerHTML = "<div style='grid-column:1/-1;text-align:center'>暂无商品</div>"; return; }
+    
+    list.innerHTML = res.map(item=>{
+      let d = item.toJSON();
+      return `
+        <div class="card" onclick="detail('${item.id}')">
+          <div class="card-img">📦</div>
+          <div class="card-body">
+            <div class="card-title">${d.title}</div>
+            <div class="card-price">¥${d.price}</div>
+            <div class="card-user">${d.username}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }catch(e){ list.innerHTML = "加载失败"; }
+}
+
+async function detail(id){
+  try{
+    let g = await new AV.Query("Good").get(id);
+    let d = g.toJSON();
+    document.getElementById("d-title").innerText = d.title;
+    document.getElementById("d-price").innerText = "¥"+d.price;
+    document.getElementById("d-desc").innerText = d.desc||"无描述";
+    document.getElementById("d-cate").innerText = d.category;
+    document.getElementById("d-user").innerText = d.username;
+    go("detail");
+  }catch(e){showToast("加载失败");}
+}
+
+async function publish(e){
+  e.preventDefault();
+  if(!user) return showToast("请先登录");
+  
+  let title = document.getElementById("title").value;
+  let desc = document.getElementById("desc").value;
+  let price = document.getElementById("price").value;
+  let category = document.getElementById("category").value;
+  
+  try{
+    const Good = AV.Object.extend("Good");
+    const g = new Good();
+    g.set("title", title);
+    g.set("desc", desc);
+    g.set("price", price);
+    g.set("category", category);
+    g.set("username", user.username);
+    await g.save();
+    showToast("发布成功");
+    go("home");
+  }catch(e){ showToast("发布失败"); }
+}
+
+loadUser();
+loadGoods();
+</script>
+</body>
+</html>
